@@ -34,15 +34,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Save unverified user with OTP
     const hashedPassword = await hashPassword(password);
     const user = await UserModel.create({
-      userData: {
-        username,
-        email,
-        password_hash: hashedPassword,
-        role: userRole,
-        is_verified: false,
-        verification_token: otp,
-        token_expires: tokenExpires
-      }
+      username,
+      email,
+      password_hash: hashedPassword,
+      role: role === 'admin' ? 'user' : role || 'user',
+      is_verified: false,
+      verification_token: otp,
+      token_expires: tokenExpires
     });
 
     // Send verification email

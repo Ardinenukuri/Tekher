@@ -51,41 +51,39 @@ class UserModel {
   //   return rows[0];
   // }
 
-  static async create({ userData }: {
-  userData: {
-    username: string;
-    email: string;
-    password_hash: string;
-    is_verified?: boolean;
-    verification_token?: string;
-    token_expires?: Date;
-    role?: string;
-    
-  };
+  // src/models/user.model.ts
+static async create(userData: {
+  username: string;
+  email: string;
+  password_hash: string;
+  role?: string;
+  is_verified?: boolean;
+  verification_token?: string;
+  token_expires?: Date;
 }): Promise<User> {
   const { rows } = await pool.query(
     `INSERT INTO users (
       username, 
       email, 
       password_hash,
+      role,
       is_verified,
       verification_token,
       token_expires
-     ) VALUES ($1, $2, $3, $4, $5, $6) 
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7) 
      RETURNING *`,
     [
       userData.username,
       userData.email,
       userData.password_hash,
+      userData.role || 'user',
       userData.is_verified || false,
       userData.verification_token || null,
-      userData.token_expires || null,
-      userData.role || 'user'
+      userData.token_expires || null
     ]
   );
   return rows[0];
 }
-   
 
 
 

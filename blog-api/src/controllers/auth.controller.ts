@@ -5,21 +5,24 @@ import { hashPassword, comparePassword } from '../utils/password.utils';
 import { generateResetToken, sendResetEmail } from '../utils/passwordReset';
 import pool from '../config/db';
 import { generateOTP, sendVerificationEmail } from '../utils/emailVerification';
+import {
+  registerSchema,
+  verifyEmailSchema,
+  loginSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
+} from '../schemas/auth.schema';
+import { handleZodError } from '../utils/errors';
+import { ZodError } from 'zod';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ceeea2d8e605d0b45522104f3e1dfb79cfcb160c965073108a15e216f2e44e88';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, email, password, role } = req.body;
+    const parsed = registerSchema.parse(req.body);
+    const { username, email, password, role } = parsed;
 
-    // Prevent self-assigning admin role
     const userRole = role === 'admin' ? 'user' : role || 'user';
-    
-    // Validate input
-    if (!username || !email || !password) {
-      res.status(400).json({ message: 'All fields are required' });
-      return;
-    }
 
     const existingUser = await UserModel.findByEmail(email);
     if (existingUser) {
@@ -28,103 +31,106 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     const otp = generateOTP();
-    const tokenExpires = new Date(Date.now() + 600000); 
-    
-    // Save unverified user with OTP
+    const tokenExpires = new Date(Date.now() + 600000);
+
     const hashedPassword = await hashPassword(password);
     const user = await UserModel.create({
       username,
       email,
       password_hash: hashedPassword,
-      role: role === 'admin' ? 'user' : role || 'user',
+      role: role as 'admin' | 'moderator' | 'user',
       is_verified: false,
       verification_token: otp,
-      token_expires: tokenExpires
+      token_expires: tokenExpires,
     });
 
-    // Send verification email
     await sendVerificationEmail(email, otp);
-    
-    res.status(201).json({ 
+
+    res.status(201).json({
       message: 'Verification OTP sent to email',
-      userId: user.id 
+      userId: user.id,
     });
-    
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed' });
+  } catch (error: unknown) {
+  if (error instanceof ZodError) {
+    res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+  } else {
+    console.error('Registration failed:', error);
+    res.status(500).json({ message: 'Registration error' });
   }
+}
 };
 
 export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, otp } = req.body;
-    
+    const parsed = verifyEmailSchema.parse(req.body);
+    const { email, otp } = parsed;
+
     const user = await UserModel.findByEmail(email);
-    
     if (!user) {
       res.status(404).json({ message: 'User not found' });
       return;
     }
-    
+
     if (user.is_verified) {
       res.status(400).json({ message: 'Email already verified' });
       return;
     }
-    
+
     if (user.verification_token !== otp) {
       res.status(400).json({ message: 'Invalid OTP' });
       return;
     }
-    
+
     if (user.token_expires < new Date()) {
       res.status(400).json({ message: 'OTP expired' });
       return;
     }
-    
-    // // Mark as verified
-    // await UserModel.update(user.id, { 
+
+    // Optionally update verification fields
+    // await UserModel.update(user.id, {
     //   is_verified: true,
     //   verification_token: null,
-    //   token_expires: null 
+    //   token_expires: null,
     // });
-    
-    // Generate auth token
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
-    
-    res.json({ 
+
+    res.json({
       message: 'Email verified successfully',
-      token 
+      token,
     });
-    
-  } catch (error) {
-    console.error('Verification error:', error);
-    res.status(500).json({ message: 'Verification failed' });
+  } catch (error: unknown) {
+  if (error instanceof ZodError) {
+    res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+  } else {
+    console.error('validatio error:', error);
+    res.status(500).json({ message: 'validation failed' });
+  }
+
   }
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
-    
+    const parsed = loginSchema.parse(req.body);
+    const { email, password } = parsed;
+
     const user = await UserModel.findByEmail(email);
-    if (!user) {
+    if (!user || !(await comparePassword(password, user.password_hash))) {
       res.status(401).json({ message: 'Invalid credentials' });
       return;
     }
-    
-    const isMatch = await comparePassword(password, user.password_hash);
-    if (!isMatch) {
-      res.status(401).json({ message: 'Invalid credentials' });
-      return;
-    }
-    
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
-  } catch (error) {
-    console.error(error);
+  } catch (error: unknown) {
+  if (error instanceof ZodError) {
+    res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+  } else {
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
+}
 };
 
 export const getProfile = async (req: Request, res: Response): Promise<void> => {
@@ -151,63 +157,47 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-// Request Password Reset
 export const requestPasswordReset = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
-    const user = await UserModel.findByEmail(email);
+    const parsed = passwordResetRequestSchema.parse(req.body);
+    const { email } = parsed;
 
+    const user = await UserModel.findByEmail(email);
     if (!user) {
-      
       res.status(200).json({ message: 'Email not found' });
       return;
     }
 
     const token = generateResetToken();
-    const expires = new Date(Date.now() + 3600000); 
+    const expires = new Date(Date.now() + 3600000);
 
     await UserModel.setResetToken(email, token, expires);
-    
-    try {
-      await sendResetEmail(email, token);
-      res.json({ message: 'Reset link sent to email' });
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      res.status(500).json({ message: 'Error sending reset email' });
-    }
-    
-  } catch (error) {
+    await sendResetEmail(email, token);
+
+    res.json({ message: 'Reset link sent to email' });
+  } catch (error: unknown) {
+  if (error instanceof ZodError) {
+    res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+  } else {
     console.error('Password reset error:', error);
     res.status(500).json({ message: 'Server error' });
   }
+}
 };
 
-// Reset Password
 export const resetPassword = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { token, newPassword } = req.body;
-    
-    if (!token || !newPassword) {
-      res.status(400).json({ message: 'Token and new password are required' });
-      return;
-    }
+    const parsed = passwordResetSchema.parse(req.body);
+    const { token, newPassword } = parsed;
 
     const user = await UserModel.findByResetToken(token);
-    
     if (!user) {
       res.status(400).json({ message: 'Invalid or expired token' });
       return;
     }
 
-    // Validate new password strength
-    if (newPassword.length < 8) {
-      res.status(400).json({ message: 'Password must be at least 8 characters' });
-      return;
-    }
-
     const hashedPassword = await hashPassword(newPassword);
-    
-    // Update password and clear token in a transaction
+
     await pool.query('BEGIN');
     try {
       await UserModel.updatePassword(user.id, hashedPassword);
@@ -225,8 +215,12 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     }
 
     res.json({ message: 'Password updated successfully' });
-  } catch (error) {
-    console.error('Password reset error:', error);
-    res.status(500).json({ message: 'Error resetting password' });
+  } catch (error: unknown) {
+  if (error instanceof ZodError) {
+    res.status(400).json({ message: error.errors.map(e => e.message).join(', ') });
+  } else {
+    console.error('password update failed:', error);
+    res.status(500).json({ message: 'Server error' });
   }
+}
 };

@@ -14,8 +14,8 @@ export const requireRole = (requiredRole: string): RequestHandler => {
   };
 };
 
-export const requireAdmin = requireRole('admin');
-// Promotion controller with proper typing
+
+
 export const promoteToAdmin = async (
   req: Request, 
   res: Response
@@ -43,4 +43,12 @@ export const promoteToAdmin = async (
     console.error('Promotion error:', error);
     res.status(500).json({ message: 'Failed to promote user' });
   }
+};
+
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  // Assuming you have user data attached to req after authentication
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Requires admin role' });
+  }
+  next();
 };

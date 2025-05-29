@@ -1,6 +1,7 @@
+// admin.controller.ts
 import { Request, Response } from 'express';
 import UserModel from '../models/user.model';
-import pool from '../config/db';
+import PostModel from '../models/post.model'; // Assuming you have a PostModel
 
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -11,31 +12,42 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const promoteToAdmin = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const getAllPosts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId } = req.body;
-    
-    if (!req.user || req.user.role !== 'admin') {
-      res.status(403).json({ message: 'Requires admin privileges' });
-      return;
-    }
-
-    const { rowCount } = await pool.query(
-      `UPDATE users SET role = 'admin' WHERE id = $1 RETURNING id, email`,
-      [userId]
-    );
-
-    if (rowCount === 0) {
-      res.status(404).json({ message: 'User not found' });
-      return;
-    }
-
-    res.json({ message: 'User promoted to admin successfully' });
+    // Assuming you have a PostModel with findAll method
+    const posts = await PostModel.findAll();
+    res.json(posts);
   } catch (error) {
-    console.error('Promotion error:', error);
-    res.status(500).json({ message: 'Failed to promote user' });
+    res.status(500).json({ message: 'Failed to fetch posts' });
+  }
+};
+
+export const deleteUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    
+    // Prevent admin from deleting themselves
+    if (req.user?.userId === parseInt(userId)) {
+      res.status(400).json({ message: 'Admins cannot delete themselves' });
+      return;
+    }
+
+    await UserModel.delete(parseInt(userId));
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete user' });
+  }
+};
+
+
+
+export const deletePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { postId } = req.params;
+    
+    await PostModel.delete(parseInt(postId));
+    res.json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete post' });
   }
 };

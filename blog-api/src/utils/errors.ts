@@ -1,3 +1,6 @@
+import { ZodError } from 'zod';
+import { Response } from 'express';
+
 export class NotFoundError extends Error {
   statusCode = 404;
   constructor(message = 'Resource not found') {
@@ -29,3 +32,12 @@ export class BadRequestError extends Error {
     this.name = 'BadRequestError';
   }
 }
+
+export const handleZodError = (error: ZodError, res: Response): void => {
+  const formatted = error.errors.map((err) => ({
+    field: err.path.join('.'),
+    message: err.message,
+  }));
+
+  res.status(400).json({ errors: formatted });
+};

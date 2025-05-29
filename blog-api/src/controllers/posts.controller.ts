@@ -4,7 +4,13 @@ import PostModel from '../models/post.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors';
 import { ApiResponse } from '../types/common.types';
 
-
+export interface AuthenticatedRequest extends Request {
+  user: {
+    id: number;
+    userId: number;
+    role: string;
+  };
+}
 
 export const createPost = async (
   req: Request,
@@ -82,56 +88,44 @@ export const getPostById = async (
   }
 };
 
-
-export const updatePost = async (
-  req: Request,
-  res: Response<ApiResponse>,
-  next: NextFunction
-): Promise<void> => {
+export const updatePost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const postId = parseInt(req.params.id, 10);
+    const postId = parseInt(req.params.id);
     const userId = (req as any).user?.userId;
 
-    // Validate request body with Zod schema
+    // Validate the request body with Zod schema
     const parseResult = updatePostSchema.safeParse(req.body);
     if (!parseResult.success) {
       const errors: Record<string, string[]> = {};
-      parseResult.error.errors.forEach((err) => {
+      parseResult.error.errors.forEach(err => {
         const field = err.path[0] as string;
         if (!errors[field]) errors[field] = [];
         errors[field].push(err.message);
       });
-
-      res.status(400).json({
+      const response: ApiResponse = {
         success: false,
         message: 'Validation errors',
         errors,
-      });
+      };
+      res.status(400).json(response);
       return;
     }
-
     const { title, content } = parseResult.data;
 
-    // Find post by ID
+    // Check post exists and user is authorized
     const post = await PostModel.findById(postId);
-    if (!post) {
-      throw new NotFoundError('Post not found');
-    }
+    if (!post) throw new NotFoundError('Post not found');
+    if (post.user_id !== userId) throw new ForbiddenError('Not authorized');
 
-    // Authorization check
-    if (post.user_id !== userId) {
-      throw new ForbiddenError('Not authorized to update this post');
-    }
-
-    // Update post
+    // MAIN FIX: Added await here
     const updatedPost = await PostModel.update(postId, title, content);
-
-    // Send response
-    res.status(200).json({
+    
+    const response: ApiResponse = {
       success: true,
       message: 'Post updated successfully',
       data: updatedPost,
-    });
+    };
+    res.json(response);
   } catch (error) {
     next(error);
   }

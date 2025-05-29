@@ -1,5 +1,7 @@
 import pool from '../config/db';
 
+type Role = 'admin' | 'moderator' | 'user';
+
 interface User {
   is_verified: any;
   verification_token: any;
@@ -9,7 +11,7 @@ interface User {
   email: string;
   password_hash: string;
   created_at: Date;
-  role: 'admin' | 'moderator' | 'user'; 
+  role:Role ; 
 
 }
 
@@ -17,9 +19,27 @@ interface User {
 
 
 class UserModel {
-  static findAll() {
-    throw new Error('Method not implemented.');
+  static async delete(userId: number): Promise<boolean> {
+    try {
+      const result = await pool.query(
+        'DELETE FROM users WHERE id = $1', 
+        [userId]
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Database deletion error:', error);
+      throw error;
+    }
   }
+
+  static async findAll(): Promise<Omit<User, 'password_hash'>[]> {
+  const { rows } = await pool.query(
+    `SELECT id, username, email, role, is_verified, created_at FROM users`
+  );
+  return rows;
+}
+
+
   static async update(id: number, updates: Partial<User>): Promise<User> {
   const { rows } = await pool.query(
     `UPDATE users SET
@@ -56,11 +76,13 @@ static async create(userData: {
   username: string;
   email: string;
   password_hash: string;
-  role?: string;
+  role?: 'admin' | 'moderator' | 'user'; // Make type more specific
   is_verified?: boolean;
   verification_token?: string;
   token_expires?: Date;
 }): Promise<User> {
+  const defaultRole = 'user'; // Default if not specified
+  
   const { rows } = await pool.query(
     `INSERT INTO users (
       username, 
@@ -76,7 +98,7 @@ static async create(userData: {
       userData.username,
       userData.email,
       userData.password_hash,
-      userData.role || 'user',
+      userData.role || defaultRole, // Use provided role or default
       userData.is_verified || false,
       userData.verification_token || null,
       userData.token_expires || null

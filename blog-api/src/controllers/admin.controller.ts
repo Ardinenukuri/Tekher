@@ -1,24 +1,76 @@
 // admin.controller.ts
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import UserModel from '../models/user.model';
-import PostModel from '../models/post.model'; // Assuming you have a PostModel
+import PostModel from '../models/post.model';
+import { ApiResponse } from '../types/common.types';
+
 
 export const getAllUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const users = await UserModel.findAll();
-    res.json(users);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 2;
+    
+    const users = await UserModel.findAllPaginated(page, limit);
+    const totalUsers = await UserModel.count();
+    const totalPages = Math.ceil(totalUsers / limit);
+
+    res.json({
+      success: true,
+      data: users,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalUsers,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch users' });
+    if (error instanceof Error) {
+      res.status(500).json({ 
+        success: false,
+        message: 'Failed to fetch users',
+        error: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false,
+        message: 'Failed to fetch users',
+        error: 'An unknown error occurred' 
+      });
+    }
   }
 };
 
-export const getAllPosts = async (req: Request, res: Response): Promise<void> => {
+export const getAllPosts = async (
+  req: Request,
+  res: Response<ApiResponse>,
+  next: NextFunction
+) => {
   try {
-    // Assuming you have a PostModel with findAll method
-    const posts = await PostModel.findAll();
-    res.json(posts);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 2;
+    
+    const posts = await PostModel.findAllPaginated(page, limit);
+    const totalPosts = await PostModel.count();
+    const totalPages = Math.ceil(totalPosts / limit);
+
+    res.status(200).json({
+      success: true,
+      message: 'Posts fetched successfully',
+      data: posts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalPosts,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch posts' });
+    next(error);
   }
 };
 

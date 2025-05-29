@@ -106,6 +106,20 @@ class PostModel {
     );
     return rows[0];
   }
+
+  // In PostModel
+static async findAllPaginated(page: number = 1, limit: number = 2) {
+  const offset = (page - 1) * limit;
+  const query = 'SELECT * FROM posts LIMIT $1 OFFSET $2';
+  const result = await pool.query(query, [limit, offset]);
+  return result.rows;
+}
+
+static async count() {
+  const result = await pool.query('SELECT COUNT(*) FROM posts');
+  return parseInt(result.rows[0].count);
+  
+}
 }
 
 export default PostModel;

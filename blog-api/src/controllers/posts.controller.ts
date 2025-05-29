@@ -56,11 +56,25 @@ export const getAllPosts = async (
   next: NextFunction
 ) => {
   try {
-    const posts = await PostModel.findAll();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 2;
+    
+    const posts = await PostModel.findAllPaginated(page, limit);
+    const totalPosts = await PostModel.count();
+    const totalPages = Math.ceil(totalPosts / limit);
+
     res.status(200).json({
       success: true,
       message: 'Posts fetched successfully',
       data: posts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: totalPosts,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1
+      }
     });
   } catch (error) {
     next(error);
@@ -130,6 +144,8 @@ export const updatePost = async (req: Request, res: Response, next: NextFunction
     next(error);
   }
 };
+
+
 
 export const deletePost = async (
   req: Request,

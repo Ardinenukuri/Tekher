@@ -156,7 +156,7 @@ static async findByResetToken(token: string): Promise<User | null> {
 // In UserModel
 static async findAllPaginated(page: number = 1, limit: number = 2) {
   const offset = (page - 1) * limit;
-  const query = 'SELECT * FROM users LIMIT $1 OFFSET $2';
+  const query = 'SELECT id, username, email, role, is_verified, created_at  FROM users LIMIT $1 OFFSET $2';
   const result = await pool.query(query, [limit, offset]);
   return result.rows;
 }

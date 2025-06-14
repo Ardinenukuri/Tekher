@@ -3,15 +3,27 @@ import {
   getAllUsers,
   getAllPosts,
   deleteUser,
-  deletePost
+  deletePost,
+  createPost,
+  updatePost,
+  getAllLikes,
+  deleteComment,
+
 } from '../controllers/admin.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/admin.middleware';
+import multer from 'multer';
+import { asyncHandler } from '../utils/asyncHandler';
+
+
 
 const router = express.Router();
 
-const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
-  (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const upload = multer({ dest: 'uploads/' });
+
+
+// const asyncHandler = (fn: express.RequestHandler): express.RequestHandler =>
+//   (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(asyncHandler(authenticate), asyncHandler(requireAdmin));
 
@@ -63,6 +75,8 @@ router.use(asyncHandler(authenticate), asyncHandler(requireAdmin));
  *         $ref: '#/components/responses/Error'
  */
 router.get('/users', getAllUsers);
+router.post('/createposts', upload.single('image'), asyncHandler(createPost));
+router.put('/update/:id', upload.single('image'), asyncHandler(updatePost));
 
 /**
  * @swagger
@@ -163,5 +177,8 @@ router.delete('/users/:userId', deleteUser);
  *         description: Forbidden
  */
 router.delete('/posts/:postId', deletePost);
+
+router.get('/likes', getAllLikes);
+router.delete('/comments/:commentId', deleteComment);
 
 export default router;

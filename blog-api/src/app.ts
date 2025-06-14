@@ -3,7 +3,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import postsRoutes from './routes/posts.routes';
 import adminRoutes from './routes/admin.routes';
-import { setupSwagger } from '../swagger';
+import { setupSwagger } from './swagger';
+
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
 
 // Setup Swagger
 setupSwagger(app);

@@ -12,7 +12,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000/',
+        url: 'http://localhost:3000',
         description: 'Development server',
       },
     ],
@@ -162,7 +162,7 @@ const options = {
 const swaggerSpec = swaggerJsdoc(options);
 
 export const setupSwagger = (app: Express) => {
-  app.use('/blog', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customSiteTitle: 'Blog API',
     customCss: '.swagger-ui .topbar { display: none }',
     customfavIcon: '/public/favicon.ico',

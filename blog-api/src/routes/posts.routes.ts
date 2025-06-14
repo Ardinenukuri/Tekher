@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 import * as postsController from '../controllers/posts.controller';
 import { asyncHandler } from '../utils/asyncHandler';
+import { commentOnPost, deleteOwnComment, getComments, likePost } from '../controllers/posts.controller';
+import { getAllPosts } from '../controllers/admin.controller';
 
 const router = Router();
 
@@ -76,8 +78,8 @@ router.get('/', asyncHandler(postsController.getAllPosts));
  *               $ref: '#/components/schemas/Post'
  *       401:
  *         description: Unauthorized
- */
-router.post('/', authenticate, asyncHandler(postsController.createPost));
+//  */
+// router.post('/', authenticate, asyncHandler(postsController.createPost));
 
 /**
  * @swagger
@@ -101,8 +103,8 @@ router.post('/', authenticate, asyncHandler(postsController.createPost));
  *               $ref: '#/components/schemas/Post'
  *       404:
  *         description: Post not found
- */
-router.get('/:id', asyncHandler(postsController.getPostById));
+//  */
+// router.get('/:id', asyncHandler(postsController.getPostById));
 
 /**
  * @swagger
@@ -143,8 +145,8 @@ router.get('/:id', asyncHandler(postsController.getPostById));
  *         description: Unauthorized
  *       404:
  *         description: Post not found
- */
-router.put('/:id', authenticate, asyncHandler(postsController.updatePost));
+//  */
+// router.put('/:id', authenticate, asyncHandler(postsController.updatePost));
 
 /**
  * @swagger
@@ -168,7 +170,14 @@ router.put('/:id', authenticate, asyncHandler(postsController.updatePost));
  *         description: Unauthorized
  *       404:
  *         description: Post not found
- */
-router.delete('/:id', authenticate, asyncHandler(postsController.deletePost));
+//  */
+// router.delete('/:id', authenticate, asyncHandler(postsController.deletePost));
+
+// router.get('/posts', getAllPosts);
+router.get('/:id', postsController.getPostById);
+router.post('/:postId/comments', commentOnPost);
+router.get('/:postId/comments', getComments);
+router.delete('/comments/:commentId', asyncHandler(deleteOwnComment));
+router.post('/:postId/like', likePost);
 
 export default router;

@@ -4,10 +4,14 @@ type AsyncRequestHandler = (
   req: Request,
   res: Response,
   next: NextFunction
-) => Promise<void>;
+) => Promise<any>; // Allow any return, not just void
 
-export const asyncHandler = (fn: AsyncRequestHandler): RequestHandler => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch(next);
+
+
+export const asyncHandler = (
+  fn: (req: Request, res: Response, next: NextFunction) => any
+): RequestHandler => {
+  return (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
   };
 };

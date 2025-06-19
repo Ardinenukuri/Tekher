@@ -30,18 +30,21 @@ interface CreatePostData {
   slug: string;
   userId: number;
   status: PostStatus;
-  categoryId?: number;
-  image?: string;
+  categoryId?: number | null;
+  image?: string | null;
 }
 
 // A helper interface for updating posts
 type UpdatePostData = Partial<Omit<CreatePostData, 'userId'>>;
 
 class PostModel {
+  [x: string]: string;
   // FIXED & UPDATED: This method now correctly handles all new fields
   // and fixes a bug where user_id was not being inserted correctly.
   static async create(data: CreatePostData): Promise<Post> {
+    // This line uses the single 'data' object. There are no other parameters.
     const { title, content, slug, userId, status, categoryId, image } = data;
+    
     const { rows } = await pool.query(
       `INSERT INTO posts (title, content, slug, user_id, status, category_id, image) 
        VALUES ($1, $2, $3, $4, $5, $6, $7) 
@@ -54,6 +57,7 @@ class PostModel {
   // UPDATED: This method now uses COALESCE to handle partial updates for all fields,
   // making it much more flexible and robust.
   static async update(id: number, updates: UpdatePostData): Promise<Post> {
+    // This line uses the 'id' and the single 'updates' object.
     const { title, content, slug, status, categoryId, image } = updates;
 
     const { rows, rowCount } = await pool.query(
@@ -77,7 +81,6 @@ class PostModel {
 
     return rows[0];
   }
-
   // UPDATED: Joins with categories to get the category name.
   // Uses LEFT JOIN to ensure posts without a category are still returned.
   static async findAll(): Promise<Post[]> {
@@ -92,17 +95,31 @@ class PostModel {
   }
 
   // UPDATED: Also joins with categories.
-  static async findById(id: number): Promise<Post | null> {
-    const { rows } = await pool.query(
-      `SELECT p.*, u.username as author_name, c.name as category_name
-       FROM posts p
-       JOIN users u ON p.user_id = u.id
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = $1`,
-      [id]
-    );
-    return rows[0] || null;
+  static async findById(id: number): Promise<any | null> {
+    // Check the type of the ID received by the model
+    console.log(`[POST MODEL] findById received ID: ${id} (Type: ${typeof id})`);
+
+    const query = {
+      text: 'SELECT * FROM posts WHERE id = $1',
+      values: [id],
+    };
+
+    console.log(`[POST MODEL] Executing query: ${query.text} with values: [${query.values}]`);
+
+    try {
+      const result = await pool.query(query);
+      if (result.rows.length > 0) {
+        console.log('[POST MODEL] Post found. Returning row data.');
+        return result.rows[0];
+      }
+      console.log('[POST MODEL] Query executed, but no rows were returned.');
+      return null;
+    } catch (error) {
+      console.error('[POST MODEL] Error executing findById query:', error);
+      throw error;
+    }
   }
+
 
   static async delete(id: number): Promise<void> {
     await pool.query('DELETE FROM posts WHERE id = $1', [id]);

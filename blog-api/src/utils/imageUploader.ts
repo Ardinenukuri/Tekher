@@ -1,54 +1,50 @@
-import multer, { Multer } from 'multer';
-import path from 'path';
+import multer from 'multer';
+import { Request } from 'express';
+import { v4 as uuidv4 } from 'uuid';
+
+const MIME_TYPE_MAP: { [key: string]: string } = {
+  'image/png': '.png',
+  'image/jpeg': '.jpeg',
+  'image/jpg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+};
 
 const storage = multer.diskStorage({
-  destination: function (req: any, _file: any, cb: (arg0: null, arg1: string) => void) {
-    cb(null, 'uploads/'); 
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
   },
-  filename: function (req: any, file: { originalname: string }, cb: (arg0: null, arg1: string) => void) {
-    const ext = path.extname(file.originalname);
-    const baseName = path.basename(file.originalname, ext);
-    cb(null, `${baseName}-${Date.now()}${ext}`);
+  filename: (req, file, cb) => {
+    const extension = MIME_TYPE_MAP[file.mimetype];
+    if (!extension) {
+      return cb(new Error('Invalid image type'), '');
+    }
+    cb(null, `${uuidv4()}${extension}`);
   },
 });
 
-
-const fileFilter = (
-  req: Express.Request,
-  file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
-) => {
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (allowedMimeTypes.includes(file.mimetype)) {
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const isValid = !!MIME_TYPE_MAP[file.mimetype];
+  if (isValid) {
     cb(null, true);
   } else {
     cb(new Error('Only image files are allowed!'));
   }
 };
 
-
-const limits = {
-  fileSize: 5 * 1024 * 1024,
-};
-
-
-export const upload = multer({
+const multerUpload = multer({
   storage,
   fileFilter,
-  limits,
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-
-export const uploadImage = async (file: Express.Multer.File) => {
-  try {
-  
-    const destinationPath = `uploads/${file.filename}`;
-    
-
-
-    return destinationPath; 
-  } catch (err) {
-    console.error('Error uploading image:', err);
-    throw err;
-  }
+export const processImage = (req: Request): Promise<Express.Multer.File | undefined> => {
+  return new Promise((resolve, reject) => {
+    multerUpload.single('image')(req, {} as any, (err: any) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve(req.file);
+    });
+  });
 };

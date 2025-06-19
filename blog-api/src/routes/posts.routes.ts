@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware';
 import * as postsController from '../controllers/posts.controller';
 import { asyncHandler } from '../utils/asyncHandler';
-import { commentOnPost, deleteOwnComment, getComments, likePost } from '../controllers/posts.controller';
-import { getAllPosts } from '../controllers/admin.controller';
+import { commentOnPost, deleteOwnComment, getComments, getCommentsForPost, likePost } from '../controllers/posts.controller';
+import { getAllLikes, getAllPosts } from '../controllers/admin.controller';
 
 const router = Router();
 
@@ -104,7 +104,7 @@ router.get('/', asyncHandler(postsController.getAllPosts));
  *       404:
  *         description: Post not found
 //  */
-// router.get('/:id', asyncHandler(postsController.getPostById));
+router.get('/:id', asyncHandler(postsController.getPostById));
 
 /**
  * @swagger
@@ -175,9 +175,14 @@ router.get('/', asyncHandler(postsController.getAllPosts));
 
 // router.get('/posts', getAllPosts);
 router.get('/:id', postsController.getPostById);
-router.post('/:postId/comments', commentOnPost);
+router.post('/:postId/comment', commentOnPost);
 router.get('/:postId/comments', getComments);
 router.delete('/comments/:commentId', asyncHandler(deleteOwnComment));
 router.post('/:postId/like', likePost);
+router.get('/:postId/comments', getCommentsForPost)
+
+router.get('/likes', getAllLikes);
+
+
 
 export default router;

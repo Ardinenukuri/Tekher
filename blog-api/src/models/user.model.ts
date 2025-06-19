@@ -4,8 +4,8 @@ type Role = 'admin' | 'moderator' | 'user';
 
 interface User {
   is_verified: any;
-  verification_token: any;
-  token_expires: Date;
+  verification_token: any,
+  token_expires: Date | null;
   id: number;
   username: string;
   email: string;
@@ -165,6 +165,14 @@ static async count() {
   const result = await pool.query('SELECT COUNT(*) FROM users');
   return parseInt(result.rows[0].count);
 }
+
+static async findByVerificationToken(token: string): Promise<User | null> {
+    const { rows } = await pool.query(
+      'SELECT * FROM users WHERE verification_token = $1',
+      [token]
+    );
+    return rows[0] || null;
+  }
 
 
 }

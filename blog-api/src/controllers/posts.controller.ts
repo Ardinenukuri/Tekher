@@ -6,6 +6,8 @@ import { ApiResponse } from '../types/common.types';
 import CommentModel from '../models/comment.model';
 import LikeModel from '../models/like.model';
 import jwt from 'jsonwebtoken';
+import pool from '../config/db';
+import { getUserIdFromToken } from '../utils/auth';
 
 export interface AuthenticatedRequest extends Request {
   user: {
@@ -84,26 +86,43 @@ export const getAllPosts = async (
   }
 };
 
-export const getPostById = async (
-  req: Request,
-  res: Response<ApiResponse>,
-  next: NextFunction
-) => {
-  try {
-    const postId = parseInt(req.params.id);
-    const post = await PostModel.findById(postId);
+// In your src/controllers/posts.controller.ts (or wherever getPostById is)
 
-    if (!post) throw new NotFoundError('Post not found');
+// export const getPostById = async (req: Request, res: Response): Promise<void> => {
+//   try {
+//     const { id } = req.params; 
+//     console.log(`[BACKEND CONTROLLER] Received request for post with param: ${id} (Type: ${typeof id})`);
 
-    res.status(200).json({
-      success: true,
-      message: 'Post retrieved successfully',
-      data: post,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+//     // --- THIS IS THE CRUCIAL FIX ---
+//     // Convert the 'id' parameter from a string to an integer.
+//     const postId = parseInt(id, 10);
+
+//     // Add a check to ensure the result is a valid number.
+//     // This prevents errors if someone navigates to /api/posts/abc
+//     if (isNaN(postId)) {
+//       res.status(400).json({ message: 'Invalid post ID format. Must be a number.' });
+//       return;
+//     }
+//     // ------------------------------------
+
+//     console.log(`[BACKEND CONTROLLER] Parsed ID to number: ${postId}. Calling model...`);
+
+//     // Now, pass the numeric `postId` to your model function.
+//     const post = await PostModel.findById(postId); 
+
+//     if (!post) {
+//       console.log(`[BACKEND CONTROLLER] Post with ID ${postId} not found by model.`);
+//       res.status(404).json({ message: 'Post not found' });
+//       return;
+//     }
+
+//     res.json(post);
+
+//   } catch (error) {
+//     console.error(`Error in getPostById for param ${req.params.id}:`, error);
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// };
 
 // export const updatePost = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
 //   try {
@@ -234,4 +253,91 @@ export const authReq = (req: Request): { userId: number } => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: number };
 
   return { userId: decoded.userId };
+};
+
+export const getCommentsForPost = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { postId } = req.params;
+
+    // --- THIS IS THE UPDATED SQL QUERY ---
+    // It joins with the users table to get the `username` for each comment.
+    const query = `
+      SELECT 
+        c.id, 
+        c.text, 
+        c.created_at, 
+        c.user_id, 
+        u.username AS author,  -- We select the username and alias it as "author"
+        u.role                 -- You can also select the role or other user info
+      FROM 
+        comments c
+      JOIN 
+        users u ON c.user_id = u.id
+      WHERE 
+        c.post_id = $1
+      ORDER BY 
+        c.created_at DESC
+    `;
+
+    const result = await pool.query(query, [postId]);
+    
+    // The backend now returns an array of comments, each with an `author` field.
+    res.status(200).json(result.rows);
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const getPostById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const postId = parseInt(req.params.id, 10);
+    if (isNaN(postId)) {
+      res.status(400).json({ success: false, message: 'Invalid post ID format. Must be a number.' });
+      return;
+    }
+
+    const currentUserId = getUserIdFromToken(req);
+
+    const post = await PostModel.findById(postId);
+    if (!post) {
+      res.status(404).json({ success: false, message: 'Post not found' });
+      return;
+    }
+
+    const [commentsResult, likesResult, userLikeResult] = await Promise.all([
+      pool.query(
+        `SELECT c.*, u.username AS author 
+         FROM comments c
+         JOIN users u ON c.user_id = u.id
+         WHERE c.post_id = $1 
+         ORDER BY c.created_at DESC`,
+        [postId]
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM likes WHERE post_id = $1`,
+        [postId]
+      ),
+      currentUserId
+        ? pool.query(
+            `SELECT 1 FROM likes WHERE post_id = $1 AND user_id = $2`,
+            [postId, currentUserId]
+          )
+        : Promise.resolve({ rowCount: 0 }),
+    ]);
+
+    const fullPostData = {
+      ...post,
+      comments: commentsResult.rows,
+      likes: parseInt(likesResult.rows[0].count, 10),
+      // FIX #2: Safely access rowCount
+      userHasLiked: (userLikeResult?.rowCount ?? 0) > 0,
+    };
+
+    res.status(200).json({ success: true, data: fullPostData });
+
+  } catch (err) {
+    next(err);
+  }
 };

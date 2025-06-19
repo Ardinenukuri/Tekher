@@ -8,10 +8,12 @@ import {
   updatePost,
   getAllLikes,
   deleteComment,
+  getAllPostsforadmin,
 
 } from '../controllers/admin.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/admin.middleware';
+import { authorizeSuperAdmin } from '../middlewares/superadmin.middleware';
 import multer from 'multer';
 import { asyncHandler } from '../utils/asyncHandler';
 
@@ -75,8 +77,8 @@ router.use(asyncHandler(authenticate), asyncHandler(requireAdmin));
  *         $ref: '#/components/responses/Error'
  */
 router.get('/users', getAllUsers);
-router.post('/createposts', upload.single('image'), asyncHandler(createPost));
-router.put('/update/:id', upload.single('image'), asyncHandler(updatePost));
+router.post('/createposts', asyncHandler(createPost));
+router.put('/update/:id', asyncHandler(updatePost));
 
 /**
  * @swagger
@@ -112,7 +114,7 @@ router.put('/update/:id', upload.single('image'), asyncHandler(updatePost));
  *         description: Forbidden
  *         $ref: '#/components/responses/Error'
  */
-router.get('/posts', getAllPosts);
+router.get('/posts', getAllPostsforadmin);
 
 /**
  * @swagger
@@ -180,5 +182,6 @@ router.delete('/posts/:postId', deletePost);
 
 router.get('/likes', getAllLikes);
 router.delete('/comments/:commentId', deleteComment);
+
 
 export default router;

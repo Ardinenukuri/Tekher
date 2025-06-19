@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import UserModel from '../models/user.model';
 import user from '../types/express'
+import { ApiResponse } from '../types/common.types';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -27,12 +28,39 @@ export const authenticate = async (
       return;
     }
 
-    // Type-safe user attachment
+    
     req.user = {userId: user.id, role: user.role || 'user'  };
     
     next();
   } catch (error) {
     console.error('Authentication error:', error);
     res.status(401).json({ message: 'Not authorized' });
+  }
+};
+
+export const getMe = async (
+  req: Request,
+  res: Response<ApiResponse>,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found.' });
+      return;
+    }
+
+    const { password_hash, ...userWithoutPassword } = user;
+
+    res.status(200).json({ success: true, user: userWithoutPassword });
+  } catch (err) {
+    next(err);
   }
 };

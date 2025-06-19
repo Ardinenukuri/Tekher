@@ -5,10 +5,11 @@ import {
   getProfile,
   resetPassword,
   requestPasswordReset,
-  verifyEmail
+  verifyEmail,
+  updateUserProfile
 } from '../controllers/auth.controller';
 import { asyncHandler } from '../utils/asyncHandler';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, getMe } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.post('/register', register);
  *       400:
  *         description: Invalid or expired token
  */
-router.post('/verify-email', asyncHandler(verifyEmail));
+router.get('/verify-email/:token', verifyEmail);
 
 /**
  * @swagger
@@ -212,5 +213,7 @@ router.post('/forgot-password', asyncHandler(requestPasswordReset));
  *         description: Invalid or expired token
  */
 router.post('/reset-password', asyncHandler(resetPassword));
+router.get('/me', authenticate, getMe);
+router.patch('/profile', authenticate, updateUserProfile);
 
 export default router;
